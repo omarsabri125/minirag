@@ -12,8 +12,30 @@ services:
       - backend
     restart: always
   
+  qdrant:
+    image: qdrant/qdrant:v1.15
+    container_name: qdrant
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    networks:
+      - backend
+    restart: always
+  
+  prometheus:
+    image: prom/prometheus:v3.7.3
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - prometheus_data:/prometheus
+  
 networks:
   backend:
   
 volumes:
   pgvector_data:
+
+
