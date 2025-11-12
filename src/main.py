@@ -20,7 +20,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
+# git rm -r --cached assets/database/
 async def startup_span():
 
     settings: Settings = get_settings()
