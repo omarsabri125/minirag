@@ -47,7 +47,7 @@ async def index_project(request: Request, project_id: int, push_request: PushReq
     collection_name = nlp_controller.create_collection_name(
         project_id=project.project_id)
 
-    _ = request.app.vectordb_client.create_collection(
+    _ = await request.app.vectordb_client.create_collection(
         collection_name=collection_name,
         embedding_size=request.app.embedding_client.embedding_size,
         do_reset=push_request.do_reset
@@ -70,7 +70,7 @@ async def index_project(request: Request, project_id: int, push_request: PushReq
         chunks_ids = [c.chunk_id for c in page_chunks]
         idx += len(page_chunks)
 
-        is_inserted = nlp_controller.index_into_vector_db(
+        is_inserted = await nlp_controller.index_into_vector_db(
             project=project,
             chunks=page_chunks,
             chunks_ids=chunks_ids
@@ -111,7 +111,7 @@ async def get_project_index_info(request: Request, project_id: int):
         template_parser=request.app.template_parser
     )
 
-    collection_info = nlp_controller.get_vector_db_collection_info(
+    collection_info = await nlp_controller.get_vector_db_collection_info(
         project=project)
 
     return JSONResponse(
@@ -139,7 +139,7 @@ async def search_index(request: Request, project_id: int, search_request: Search
         template_parser=request.app.template_parser
     )
 
-    results = nlp_controller.search_vector_db_collection(
+    results = await nlp_controller.search_vector_db_collection(
         project=project,
         text=search_request.text,
         limit=search_request.limit
@@ -178,7 +178,7 @@ async def answer_rag(request: Request, project_id: int, search_request: SearchRe
         template_parser=request.app.template_parser
     )
 
-    answer, full_prompt, chat_history = nlp_controller.rag_answer_question(
+    answer, full_prompt, chat_history = await nlp_controller.rag_answer_question(
         project=project,
         query=search_request.text,
         limit=search_request.limit
