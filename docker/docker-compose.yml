@@ -37,5 +37,7 @@ networks:
   
 volumes:
   pgvector_data:
+  qdrant_data:
+  prometheus_data:
 
 
