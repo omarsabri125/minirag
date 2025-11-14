@@ -6,6 +6,7 @@ from logger import logger
 from typing import List
 
 class QdrantDBProvider(VectorDBInterface):
+    
     def __init__(self, db_client: str, distance_method: str):
 
         self.client = None
@@ -37,7 +38,7 @@ class QdrantDBProvider(VectorDBInterface):
         return self.client.get_collection(collection_name=collection_name)
 
     async def delete_collection(self, collection_name: str) -> bool:
-        if self.is_collection_exists(collection_name):
+        if await self.is_collection_exists(collection_name):
             self.client.delete_collection(collection_name=collection_name)
             return True
         return False
@@ -45,12 +46,11 @@ class QdrantDBProvider(VectorDBInterface):
     async def create_collection(self, collection_name: str, embedding_size: int, do_reset: bool = False):
 
         if do_reset:
-            _ = self.delete_collection(collection_name)
-        
-        if not self.is_collection_exists(collection_name):
+            _ = await self.delete_collection(collection_name)
+
+        if not await self.is_collection_exists(collection_name):
             self.logger.info(f"Creating new Qdrant collection: {collection_name}")
 
-        if not self.is_collection_exists(collection_name):
             self.client.create_collection(
                 collection_name=collection_name,
                 vectors_config=models.VectorParams(
@@ -65,7 +65,7 @@ class QdrantDBProvider(VectorDBInterface):
 
     async def insert_one(self, collection_name: str, text: str, vector: list, metadata: dict = None, id: str = None):
 
-        if not self.is_collection_exists(collection_name):
+        if not await self.is_collection_exists(collection_name):
             logger.error(f"Collection {collection_name} does not exist.")
             return False
 
@@ -87,7 +87,7 @@ class QdrantDBProvider(VectorDBInterface):
 
     async def insert_many(self, collection_name: str, texts: list, vectors: list, metadatas: list = None, ids: list = None, batch_size: int = 50):
 
-        if not self.is_collection_exists(collection_name):
+        if not await self.is_collection_exists(collection_name):
             logger.error(f"Collection {collection_name} does not exist.")
             return False
 
