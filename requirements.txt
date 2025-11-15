@@ -18,3 +18,4 @@ alembic==1.17.1
 psycopg2==2.9.11
 pgvector==0.4.1
 nltk==3.9.2
+tiktoken==0.12.0
