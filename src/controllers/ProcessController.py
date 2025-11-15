@@ -77,10 +77,9 @@ class ProcessController(BaseController):
     
     def recursive_chunk_text(self, documents):
 
-        splitter = RecursiveCharacterTextSplitter(
+        splitter = RecursiveCharacterTextSplitter.from_tiktoken_encoder(
             chunk_size=1000,
-            chunk_overlap=200,
-            length_function=len
+            chunk_overlap=200
         )
         chunks = splitter.split_documents(documents)
         return chunks
