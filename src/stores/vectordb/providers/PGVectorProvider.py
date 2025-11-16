@@ -111,7 +111,7 @@ class PGVectorProvider(VectorDBInterface):
     async def create_collection(self, collection_name: str, embedding_size: int, do_reset: bool = False):
 
         if do_reset:
-            _ = self.delete_collection(collection_name=collection_name)
+            _ = await self.delete_collection(collection_name=collection_name)
 
         is_collection_existed = await self.is_collection_exists(collection_name=collection_name)
 
@@ -144,7 +144,7 @@ class PGVectorProvider(VectorDBInterface):
                 check_sql = sql_text(f"""
                                      SELECT 1 
                                      FROM pg_indexes
-                                     WHERE table_name = :collection_name
+                                     WHERE tablename = :collection_name
                                      AND indexname = :index_name
                                      """)
                 result = await session.execute(check_sql, {"collection_name": collection_name, "index_name": index_name})
@@ -302,7 +302,7 @@ class PGVectorProvider(VectorDBInterface):
                 search_sql = sql_text(
                     f'SELECT {PgVectorTableSchemeEnums.TEXT.value} as text,  1 - ({PgVectorTableSchemeEnums.VECTOR.value} <=> :vector) as score'
                     f' FROM {collection_name}'
-                    f' ORDER BY score DEC'
+                    f' ORDER BY score DESC'
                     f' LIMIT {limit}'
                 )
                 result = await session.execute(search_sql, {"vector": vector})
