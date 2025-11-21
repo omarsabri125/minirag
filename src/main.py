@@ -7,18 +7,21 @@ from helper import get_settings, Settings
 from stores.llm.LLMProviderFactory import LLMProviderFactory
 from stores.vectordb.VectorDBProviderFactory import VectorDBProviderFactory
 from stores.llm.templates.template_parser import TemplateParser
+from utils.metrics import setup_metrics
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 
 app = FastAPI(title="Multi-Model RAG API")
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_credentials=["*"],
-    allow_headers=["*"],
-)
+setup_metrics(app)
+
+# app.add_middleware(
+#     CORSMiddleware,
+#     allow_origins=["*"],
+#     allow_methods=["*"],
+#     allow_credentials=["*"],
+#     allow_headers=["*"],
+# )
 
 # git rm -r --cached assets/database/
 async def startup_span():
