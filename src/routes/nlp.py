@@ -161,7 +161,6 @@ async def search_index(request: Request, project_id: int, search_request: Search
         }
     )
 
-
 @nlp_router.post("/index/answer/{project_id}")
 async def answer_rag(request: Request, project_id: int, search_request: SearchRequest):
 
