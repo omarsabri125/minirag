@@ -1,5 +1,23 @@
 from string import Template
 
+### Query Expansion ###
+
+# System prompt
+query_expand_system_prompt = Template("\n".join([
+    "You are an expert in semantic search and query optimization.",
+    "Your task is to expand and improve the given query to make it more detailed and comprehensive.",
+    "Include relevant synonyms and related terms to improve retrieval.",
+    "Return only the expanded query without explanations."
+]))
+
+# User prompt
+query_expand_user_prompt = Template("\n".join([
+    "## Original Query:",
+    "$query",
+    "",
+    "## Expanded Query (ONE question only):"
+]))
+
 #### RAG PROMPTS ####
 
 #### System ####
