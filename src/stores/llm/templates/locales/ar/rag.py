@@ -1,5 +1,23 @@
 from string import Template
 
+### Query Expansion ###
+
+# System prompt
+query_expand_system_prompt = Template("\n".join([
+    "أنت خبير في البحث الدلالي وتحسين الاستعلامات.",
+    "مهمتك هي توسيع وتحسين الاستعلام المقدم ليصبح أكثر تفصيلًا وشمولية.",
+    "قم بتضمين المرادفات والمصطلحات ذات الصلة لتحسين نتائج البحث.",
+    "أعد فقط الاستعلام الموسع بدون أي شروحات إضافية."
+]))
+
+# User prompt
+query_expand_user_prompt = Template("\n".join([
+    "## الاستعلام الأصلي:",
+    "$query",
+    "",
+    "## الاستعلام الموسع (سؤال واحد فقط):"
+]))
+
 #### RAG PROMPTS ####
 
 #### System ####
