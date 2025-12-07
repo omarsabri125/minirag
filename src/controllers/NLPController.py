@@ -1,6 +1,7 @@
 from .BaseController import BaseController
 from stores.llm.LLMEnums import DocumentTypeEnum
 from models.db_schemes import Project, DataChunk
+from routes.schemes.QueryExpand import SemanticExpansion
 from typing import List
 import json
 
@@ -57,14 +58,48 @@ class NLPController(BaseController):
         )
 
         return True
+    
+    async def query_expansion(self, query:str):
+
+        system_prompt = self.template_parser.get("rag", "query_expand_system_prompt")
+        user_prompt = self.template_parser.get("rag", "query_expand_user_prompt", {
+            "query": query
+        })
+
+        chat_history = [
+            self.generation_client.construt_prompt(
+                prompt = system_prompt,
+                role = self.generation_client.enums.SYSTEM.value
+            )
+        ]
+
+        answer = self.generation_client.generate_text(
+            prompt = user_prompt,
+            chat_history = chat_history
+        )
+
+        if not answer:
+            return False
+
+        return SemanticExpansion(
+            original_query = query,
+            expanded_query = answer
+        )
 
     async def search_vector_db_collection(self, project: Project, text: str, limit: int = 5):
 
         collection_name = self.create_collection_name(
             project_id=project.project_id)
+        
+        query_optimization = await self.query_expansion(
+            query= text
+        )
+
+        if not query_optimization or not query_optimization.expanded_query:
+            return False
 
         vectors = self.embedding_client.embed_text(
-            text, DocumentTypeEnum.QUERY.value)
+            query_optimization.expanded_query, DocumentTypeEnum.QUERY.value)
 
         if not vectors or len(vectors) == 0:
             return False
@@ -84,7 +119,7 @@ class NLPController(BaseController):
         if not result:
             return False
 
-        return result
+        return result    
 
     async def rag_answer_question(self, project: Project, query: str, limit: int = 5):
 
