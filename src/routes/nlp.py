@@ -46,9 +46,20 @@ async def index_project(request: Request, project_id: int, push_request: PushReq
 
     collection_name = nlp_controller.create_collection_name(
         project_id=project.project_id)
+    
+    cache_name = nlp_controller.create_cache_name(
+        project_id=project.project_id
+    )
+
 
     _ = await request.app.vectordb_client.create_collection(
         collection_name=collection_name,
+        embedding_size=request.app.embedding_client.embedding_size,
+        do_reset=push_request.do_reset
+    )
+    
+    _ = await request.app.vectordb_client.create_cache_collection(
+        cache_name=cache_name,
         embedding_size=request.app.embedding_client.embedding_size,
         do_reset=push_request.do_reset
     )
@@ -94,7 +105,6 @@ async def index_project(request: Request, project_id: int, push_request: PushReq
         }
     )
 
-
 @nlp_router.get("/index/info/{project_id}")
 async def get_project_index_info(request: Request, project_id: int):
 
@@ -139,9 +149,14 @@ async def search_index(request: Request, project_id: int, search_request: Search
         template_parser=request.app.template_parser
     )
 
+    query_vector, expanded_query = await nlp_controller.calculate_embeddings(
+        text=search_request.text
+    )
+
     results = await nlp_controller.search_vector_db_collection(
         project=project,
-        text=search_request.text,
+        query_vector=query_vector,
+        expanded_query=expanded_query,
         limit=search_request.limit
     )
 
@@ -177,9 +192,30 @@ async def answer_rag(request: Request, project_id: int, search_request: SearchRe
         template_parser=request.app.template_parser
     )
 
+    query_vector, expanded_query = await nlp_controller.calculate_embeddings(
+        text=search_request.text
+    )
+
+    # Retrieve answer from cashe if exists
+    cache_answer = await nlp_controller.retrieve_answer_from_cache(
+        project=project,
+        query_vector=query_vector
+    )
+
+    if cache_answer:
+        return JSONResponse(
+            status_code=200,
+            content={
+                "signal": ResponseEnumeration.CACHE_ANSWER_SUCCESS.value,
+                "answer_from_cache": cache_answer
+            }
+        )
+
     answer, full_prompt, chat_history = await nlp_controller.rag_answer_question(
         project=project,
         query=search_request.text,
+        query_vector=query_vector,
+        expanded_query=expanded_query,
         limit=search_request.limit
     )
 
@@ -190,6 +226,12 @@ async def answer_rag(request: Request, project_id: int, search_request: SearchRe
                 "signal": ResponseEnumeration.RAG_ANSWER_ERROR.value
             }
         )
+    
+    _ = await nlp_controller.add_answer_into_cache(
+        project=project,
+        query_vector=query_vector,
+        answer=answer
+    )
 
     return JSONResponse(
         status_code=200,
