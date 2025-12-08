@@ -32,6 +32,7 @@ class Settings(BaseSettings):
 
     VECTOR_DB_BACKEND: str
     QDRANT_DB_PATH: Optional[str] = None
+    QDRANT_CACHE_PATH: Optional[str] = None
     VECTOR_DB_DISTANCE_METHOD: Optional[str] = None
     INDEX_THRESHOLD: int
 
