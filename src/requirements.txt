@@ -19,6 +19,7 @@ psycopg2==2.9.11
 pgvector==0.4.1
 nltk==3.9.2
 tiktoken==0.12.0
+fastembed==0.7.4
 
 # Monitoring and metrics
 prometheus-client==0.23.1
