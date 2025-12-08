@@ -11,6 +11,10 @@ class DistanceMetricEnums(Enum):
     EUCLIDEAN = "euclid"
     DOT_PRODUCT = "dot"
 
+class QdrantVectorType(Enum):
+    DENSE = "dense"
+    SPARSE = "sparse"
+
 class PgVectorTableSchemeEnums(Enum):
     ID = 'id'
     TEXT = 'text'
