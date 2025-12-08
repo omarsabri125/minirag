@@ -16,6 +16,9 @@ class NLPController(BaseController):
 
     def create_collection_name(self, project_id: str):
         return f"collection_{project_id}".strip()
+    
+    def create_cache_name(self, project_id: str):
+        return f"cache_{project_id}".strip()
 
     async def reset_vector_db_collection(self, project: Project):
         collection_name = self.create_collection_name(
@@ -85,19 +88,16 @@ class NLPController(BaseController):
             original_query = query,
             expanded_query = answer
         )
+    
+    async def calculate_embeddings(self, text):
 
-    async def search_vector_db_collection(self, project: Project, text: str, limit: int = 5):
-
-        collection_name = self.create_collection_name(
-            project_id=project.project_id)
-        
         query_optimization = await self.query_expansion(
-            query= text
+            query=text
         )
 
         if not query_optimization or not query_optimization.expanded_query:
             return False
-
+        
         vectors = self.embedding_client.embed_text(
             query_optimization.expanded_query, DocumentTypeEnum.QUERY.value)
 
@@ -109,10 +109,45 @@ class NLPController(BaseController):
 
         if not query_vector:
             return False
+        
+        return query_vector, query_optimization.expanded_query
+    
+    async def retrieve_answer_from_cache(self, project: Project, query_vector: list, cache_threshold=0.5):
 
+        cache_name = self.create_cache_name(
+            project_id=project.project_id
+        )
+
+        cache_result = await self.vector_db_client.search_cache(
+            cache_name=cache_name,
+            vector=query_vector
+        )
+        if cache_result:
+            for s in cache_result:
+                if s.score <= cache_threshold:
+                    return s.payload["response_text"]
+    
+    async def add_answer_into_cache(self, project: Project, query_vector: list, answer: str):
+
+        cache_name = self.create_cache_name(
+            project_id=project.project_id
+        )
+
+        _ = await self.vector_db_client.add_to_cache(
+            cache_name=cache_name,
+            vector=query_vector,
+            response_text=answer
+        )
+        return True
+
+    async def search_vector_db_collection(self, project: Project, query_vector: list, expanded_query: str, limit: int = 5):
+
+        collection_name = self.create_collection_name(
+            project_id=project.project_id)
+        
         result = await self.vector_db_client.search_by_vector(
             collection_name=collection_name,
-            text=query_optimization.expanded_query,
+            text=expanded_query,
             query_vector=query_vector,
             limit=limit
         )
@@ -120,15 +155,16 @@ class NLPController(BaseController):
         if not result:
             return False
 
-        return result    
-
-    async def rag_answer_question(self, project: Project, query: str, limit: int = 5):
+        return result
+    
+    async def rag_answer_question(self, project: Project, query:str, query_vector: list, expanded_query: str, limit: int = 5):
 
         answer, full_prompt, chat_history = None, None, None
 
         retrieved_documents = await self.search_vector_db_collection(
             project=project,
-            text=query,
+            query_vector=query_vector,
+            expanded_query=expanded_query,
             limit=limit
         )
 
