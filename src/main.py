@@ -51,6 +51,7 @@ async def startup_span():
     app.vectordb_client = vectordb_provider_factory.create(
         settings.VECTOR_DB_BACKEND)
     await app.vectordb_client.connect()
+    await app.vectordb_client.cache_connect()
 
     app.template_parser = TemplateParser(
         language=settings.PRIMARY_LANG,
@@ -61,6 +62,7 @@ async def startup_span():
 async def shutdown_span():
     await app.db_engine.dispose()
     await app.vectordb_client.disconnect()
+    await app.vectordb_client.cache_disconnect()
 
 
 app.on_event("startup")(startup_span)
@@ -71,4 +73,4 @@ app.include_router(upload_router)
 app.include_router(nlp_router)
 
 
-# uvicorn server.main:app --reload
+# uvicorn main:app --reload --port 8001
