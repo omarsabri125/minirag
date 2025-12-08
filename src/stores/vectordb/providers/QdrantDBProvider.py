@@ -1,5 +1,5 @@
 from ..VectorDBInterface import VectorDBInterface
-from ..VectorDBEnums import DistanceMetricEnums
+from ..VectorDBEnums import DistanceMetricEnums, QdrantVectorType
 from models.db_schemes import RetrievedDocument
 from qdrant_client import QdrantClient, models
 from logger import logger
@@ -12,6 +12,7 @@ class QdrantDBProvider(VectorDBInterface):
         self.client = None
         self.db_client = db_client
         self.distance_method = None
+        self.modifier = models.Modifier.IDF
 
         if distance_method == DistanceMetricEnums.COSINE.value:
             self.distance_method = models.Distance.COSINE
@@ -53,10 +54,17 @@ class QdrantDBProvider(VectorDBInterface):
 
             self.client.create_collection(
                 collection_name=collection_name,
-                vectors_config=models.VectorParams(
-                    size=embedding_size,
-                    distance=self.distance_method
-                )
+                vectors_config={
+                    QdrantVectorType.DENSE.value: models.VectorParams(
+                        size=embedding_size,
+                        distance=self.distance_method
+                    ),
+                },
+                sparse_vectors_config={
+                    QdrantVectorType.SPARSE.value: models.SparseVectorParams(
+                        modifier = self.modifier
+                    )
+                }
             )
 
             return True
@@ -101,7 +109,13 @@ class QdrantDBProvider(VectorDBInterface):
             batch_points = [
                 models.PointStruct(
                     id=batch_ids[x],
-                    vector=batch_vectors[x],
+                    vector={
+                        QdrantVectorType.DENSE.value: batch_vectors[x],
+                        QdrantVectorType.SPARSE.value: models.Document(
+                            text=batch_text[x],
+                            model="Qdrant/bm25",
+                        ),
+                    },
                     payload={
                         "text": batch_text[x],
                         "metadata": batch_metadatas[x]
@@ -122,21 +136,37 @@ class QdrantDBProvider(VectorDBInterface):
 
         return True
     
-    async def search_by_vector(self, collection_name: str, query_vector: List, limit: int):
+    async def search_by_vector(self, collection_name: str, text: str, query_vector: List, limit: int):
 
-        results = self.client.search(
-            collection_name = collection_name,
-            query_vector = query_vector, # <--- Dense vector
-            limit = limit
-            )
-        
+        results = self.client.query_points(
+            collection_name=collection_name,
+            prefetch=[
+                models.Prefetch(
+                    query=query_vector,
+                    using=QdrantVectorType.DENSE.value,
+                    limit=limit,
+                ),
+                models.Prefetch(
+                    query=models.Document(
+                        text=text,
+                        model="Qdrant/bm25",
+                    ),
+                    using=QdrantVectorType.SPARSE.value,
+                    limit=limit,
+                )
+            ],
+            query=models.FusionQuery(
+                fusion=models.Fusion.DBSF
+            ),
+            limit=limit
+        )
 
         results = [
             RetrievedDocument(**{
                 "score": res.score,
                 "text": res.payload["text"]
             })
-            for res in results
+            for res in results.points
         ]
         
         return results
