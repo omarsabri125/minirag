@@ -11,6 +11,7 @@ class BaseController:
             os.path.dirname(os.path.abspath(__file__)))
         self.files_dir = os.path.join(self.base_dir, "assets/files")
         self.database_dir = os.path.join(self.base_dir, "assets/database")
+        self.cache_dir = os.path.join(self.base_dir, "assets/cache")
 
     def generate_random_string(self, length: int = 12):
         return ''.join(random.choices(string.ascii_lowercase + string.digits, k=length))
@@ -23,3 +24,12 @@ class BaseController:
             os.makedirs(database_path, exist_ok=True)
 
         return database_path
+    
+    def get_cache_path(self, cache_name: str):
+
+        cache_path = os.path.join(self.cache_dir, cache_name)
+
+        if not os.path.exists(cache_path):
+            os.makedirs(cache_path, exist_ok=True)
+        
+        return cache_path
