@@ -286,7 +286,7 @@ class PGVectorProvider(VectorDBInterface):
 
         return True
 
-    async def search_by_vector(self, collection_name: str, query_vector: List, limit: int) -> List[RetrievedDocument]:
+    async def search_by_vector(self, collection_name: str, text: str,  query_vector: List, limit: int) -> List[RetrievedDocument]:
 
         is_collection_existed = await self.is_collection_exists(collection_name=collection_name)
 
