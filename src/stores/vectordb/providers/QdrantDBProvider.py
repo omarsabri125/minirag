@@ -2,17 +2,21 @@ from ..VectorDBInterface import VectorDBInterface
 from ..VectorDBEnums import DistanceMetricEnums, QdrantVectorType
 from models.db_schemes import RetrievedDocument
 from qdrant_client import QdrantClient, models
+import uuid
 from logger import logger
 from typing import List
 
 class QdrantDBProvider(VectorDBInterface):
-    
-    def __init__(self, db_client: str, distance_method: str):
+
+    def __init__(self, db_client: str, qdrant_cache:str, distance_method: str, cache_threshold=0.35):
 
         self.client = None
+        self.cache_client = None
         self.db_client = db_client
+        self.qdrant_cache = qdrant_cache
         self.distance_method = None
         self.modifier = models.Modifier.IDF
+        self.cache_threshold = cache_threshold
 
         if distance_method == DistanceMetricEnums.COSINE.value:
             self.distance_method = models.Distance.COSINE
@@ -23,6 +27,68 @@ class QdrantDBProvider(VectorDBInterface):
 
         self.logger = logger
 
+    async def cache_connect(self):
+        self.cache_client = QdrantClient(path=self.qdrant_cache)
+    
+    async def cache_disconnect(self):
+        self.cache_client = None
+    
+    async def is_cache_collection_exists(self, cache_name: str) -> bool:
+        return self.cache_client.collection_exists(collection_name=cache_name)
+    
+    async def delete_cache_collection(self, cache_name: str) -> bool:
+        if await self.is_cache_collection_exists(cache_name):
+            self.cache_client.delete_collection(collection_name=cache_name)
+            return True
+        return False
+    
+    async def create_cache_collection(self, cache_name: str, embedding_size: int, do_reset: bool = False):
+
+        if do_reset:
+            _ = await self.delete_cache_collection(cache_name)
+
+        if not await self.is_cache_collection_exists(cache_name):
+            self.logger.info(
+                f"Creating new Qdrant cache collection: {cache_name}")
+    
+            self.cache_client.create_collection(
+                collection_name=cache_name,
+                vectors_config=models.VectorParams(
+                    size=embedding_size,
+                    distance=models.Distance.EUCLID
+                )
+            )
+
+    async def search_cache(self, cache_name: str, vector: list):
+
+        search_result = self.cache_client.search(
+            collection_name=cache_name,
+            query_vector=vector,
+            limit=1
+        )
+        return search_result
+    
+    async def add_to_cache(self, cache_name: str, vector: list, response_text: str):
+
+        point_id = str(uuid.uuid4())
+        point = models.PointStruct(
+            id=point_id,
+            vector=vector,
+            payload={
+                "response_text": response_text
+            }
+        )
+        try:
+            self.cache_client.upsert(
+                collection_name=cache_name,
+                points=[point]
+            )
+        except Exception as e:
+            logger.error(f"Error while inserting cache: {e}")
+            return False
+         
+        return True
+    
     async def connect(self):
         self.client = QdrantClient(path=self.db_client)
 
@@ -50,7 +116,8 @@ class QdrantDBProvider(VectorDBInterface):
             _ = await self.delete_collection(collection_name)
 
         if not await self.is_collection_exists(collection_name):
-            self.logger.info(f"Creating new Qdrant collection: {collection_name}")
+            self.logger.info(
+                f"Creating new Qdrant collection: {collection_name}")
 
             self.client.create_collection(
                 collection_name=collection_name,
@@ -62,7 +129,7 @@ class QdrantDBProvider(VectorDBInterface):
                 },
                 sparse_vectors_config={
                     QdrantVectorType.SPARSE.value: models.SparseVectorParams(
-                        modifier = self.modifier
+                        modifier=self.modifier
                     )
                 }
             )
@@ -135,7 +202,7 @@ class QdrantDBProvider(VectorDBInterface):
                 return False
 
         return True
-    
+
     async def search_by_vector(self, collection_name: str, text: str, query_vector: List, limit: int):
 
         results = self.client.query_points(
@@ -168,7 +235,5 @@ class QdrantDBProvider(VectorDBInterface):
             })
             for res in results.points
         ]
-        
+
         return results
-
-
