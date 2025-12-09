@@ -149,13 +149,13 @@ async def search_index(request: Request, project_id: int, search_request: Search
         template_parser=request.app.template_parser
     )
 
-    query_vector, expanded_query = await nlp_controller.calculate_embeddings(
+    _ , expanded_query_vector, expanded_query = await nlp_controller.calculate_embeddings(
         text=search_request.text
     )
 
     results = await nlp_controller.search_vector_db_collection(
         project=project,
-        query_vector=query_vector,
+        query_vector=expanded_query_vector,
         expanded_query=expanded_query,
         limit=search_request.limit
     )
@@ -192,7 +192,7 @@ async def answer_rag(request: Request, project_id: int, search_request: SearchRe
         template_parser=request.app.template_parser
     )
 
-    query_vector, expanded_query = await nlp_controller.calculate_embeddings(
+    query_vector, expanded_query_vector, expanded_query = await nlp_controller.calculate_embeddings(
         text=search_request.text
     )
 
@@ -214,7 +214,7 @@ async def answer_rag(request: Request, project_id: int, search_request: SearchRe
     answer, full_prompt, chat_history = await nlp_controller.rag_answer_question(
         project=project,
         query=search_request.text,
-        query_vector=query_vector,
+        query_vector=expanded_query_vector,
         expanded_query=expanded_query,
         limit=search_request.limit
     )
