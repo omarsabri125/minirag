@@ -96,23 +96,25 @@ class NLPController(BaseController):
         )
 
         if not query_optimization or not query_optimization.expanded_query:
-            return False
+            return 
+        
+        embedding_list = [text, query_optimization.expanded_query]
         
         vectors = self.embedding_client.embed_text(
-            query_optimization.expanded_query, DocumentTypeEnum.QUERY.value)
+            embedding_list, DocumentTypeEnum.QUERY.value)
 
         if not vectors or len(vectors) == 0:
             return False
 
         if isinstance(vectors, list) and len(vectors) > 0:
-            query_vector = vectors[0]
+            query_vector, expanded_query_vector = vectors[0], vectors[1]
 
-        if not query_vector:
+        if not query_vector or not expanded_query_vector:
             return False
         
-        return query_vector, query_optimization.expanded_query
+        return query_vector, expanded_query_vector, query_optimization.expanded_query
     
-    async def retrieve_answer_from_cache(self, project: Project, query_vector: list, cache_threshold=0.5):
+    async def retrieve_answer_from_cache(self, project: Project, query_vector: list, cache_threshold=0.7):
 
         cache_name = self.create_cache_name(
             project_id=project.project_id
