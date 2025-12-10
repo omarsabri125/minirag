@@ -20,6 +20,9 @@ pgvector==0.4.1
 nltk==3.9.2
 tiktoken==0.12.0
 fastembed==0.7.4
+sentence-transformers==5.1.2
+einops==0.8.1
+hf-xet==1.2.0
 
 # Monitoring and metrics
 prometheus-client==0.23.1
