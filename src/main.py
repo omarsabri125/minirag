@@ -10,6 +10,8 @@ from stores.llm.templates.template_parser import TemplateParser
 from utils.metrics import setup_metrics
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
+from sentence_transformers import CrossEncoder
+import torch
 
 app = FastAPI(title="Multi-Model RAG API")
 
@@ -27,6 +29,9 @@ setup_metrics(app)
 async def startup_span():
 
     settings: Settings = get_settings()
+
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    dtype = torch.float16 if device == 'cuda' else torch.float32
 
     postgres_conn = f"postgresql+asyncpg://{settings.POSTGRES_USERNAME}:{settings.POSTGRES_PASSWORD}@{settings.POSTGRES_HOST}:{settings.POSTGRES_PORT}/{settings.POSTGRES_MAIN_DATABASE}"
 
@@ -58,7 +63,13 @@ async def startup_span():
         default_language=settings.DEFAULT_LANG
     )
 
-
+    app.cross_encoder = CrossEncoder(
+        settings.RERANK_CROSS_ENCODER_NAME,
+        model_kwargs={"dtype": dtype},
+        trust_remote_code=True,
+    )
+    app.cross_encoder.to(device)
+    
 async def shutdown_span():
     await app.db_engine.dispose()
     await app.vectordb_client.disconnect()
