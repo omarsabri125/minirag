@@ -36,6 +36,8 @@ class Settings(BaseSettings):
     VECTOR_DB_DISTANCE_METHOD: Optional[str] = None
     INDEX_THRESHOLD: int
 
+    RERANK_CROSS_ENCODER_NAME: Optional[str] = None
+
     PRIMARY_LANG: Optional[str] = None
     DEFAULT_LANG: str
 
