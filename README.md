@@ -1,11 +1,15 @@
 # MiniRAG
-
-A flexible and scalable Retrieval-Augmented Generation (RAG) system supporting multiple LLM providers and vector databases.
+A flexible and scalable Retrieval-Augmented Generation (RAG) system supporting multiple LLM providers, vector databases, and advanced search capabilities.
 
 ## 🌟 Features
 
 - **Multiple LLM Providers**: OpenAI and Cohere integration
 - **Flexible Vector Databases**: Support for Qdrant and pgvector
+- **Advanced Search Capabilities**:
+  - **Hybrid Search**: Combines semantic (vector) and keyword (BM25) search for optimal retrieval
+  - **Query Expansion**: Automatically generates query variations to improve recall
+  - **Semantic Cache**: Caches similar queries to reduce API calls and improve response time
+  - **Document Reranking**: Reorders retrieved documents by relevance using LLM-based scoring
 - **Robust Data Storage**: PostgreSQL for storing documents, chunks, and metadata
 - **ORM Integration**: SQLAlchemy for database schema management and queries
 - **Migration Support**: Alembic for database schema versioning and evolution
@@ -21,6 +25,7 @@ A flexible and scalable Retrieval-Augmented Generation (RAG) system supporting m
 - [Configuration](#configuration)
 - [Project Structure](#project-structure)
 - [Database Architecture](#database-architecture)
+- [Advanced Features](#advanced-features)
 - [Usage](#usage)
 - [Database Migrations](#database-migrations)
 - [Docker Setup](#docker-setup)
@@ -37,27 +42,23 @@ A flexible and scalable Retrieval-Augmented Generation (RAG) system supporting m
 ## 🚀 Installation
 
 ### 1. Clone the repository
-
 ```bash
 git clone https://github.com/yourusername/minirag.git
 cd minirag
 ```
 
 ### 2. Create virtual environment
-
 ```bash
 python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 ```
 
 ### 3. Install dependencies
-
 ```bash
 pip install -r requirements.txt
 ```
 
 ### 4. Set up environment variables
-
 Create a `.env` file in the root directory:
 
 ```env
@@ -74,6 +75,16 @@ VECTOR_DB=qdrant  # or 'pgvector'
 QDRANT_URL=http://localhost:6333
 QDRANT_API_KEY=your_qdrant_api_key  # optional
 
+# Search Configuration
+ENABLE_HYBRID_SEARCH=true
+HYBRID_SEARCH_ALPHA=0.5  # Weight between semantic (0.0) and keyword (1.0) search
+ENABLE_QUERY_EXPANSION=true
+QUERY_EXPANSION_COUNT=3  # Number of query variations to generate
+ENABLE_SEMANTIC_CACHE=true
+CACHE_SIMILARITY_THRESHOLD=0.95  # Threshold for cache hit
+ENABLE_RERANKING=true
+RERANK_TOP_K=10  # Number of documents to rerank
+
 # Application Settings
 LOG_LEVEL=INFO
 ```
@@ -83,44 +94,49 @@ LOG_LEVEL=INFO
 ```
 minirag/
 ├── src/
-│   ├── routes/          # API routes and endpoints
-│   ├── stores/          # Vector store implementations
-│   │   └── llm/         # LLM provider management
-│   │       ├── providers/      # Individual LLM implementations
-│   │       ├── templates/      # Prompt templates
+│   ├── routes/                    # API routes and endpoints
+│   ├── stores/                    # Vector store implementations
+│   │   └── llm/                   # LLM provider management
+│   │       ├── providers/         # Individual LLM implementations
+│   │       ├── templates/         # Prompt templates
 │   │       ├── LLMEnums.py
 │   │       ├── LLMInterface.py
 │   │       └── LLMProviderFactory.py
-│   ├── vectordb/        # Vector database implementations
-│   │   ├── providers/          # Vector DB implementations
+│   ├── vectordb/                  # Vector database implementations
+│   │   ├── providers/             # Vector DB implementations
 │   │   ├── VectorDBEnums.py
 │   │   ├── VectorDBInterface.py
 │   │   └── VectorDBProviderFactory.py
-│   ├── models/          # SQLAlchemy ORM models
-│   │   ├── document.py         # Document model
-│   │   ├── chunk.py            # Chunk model
-│   │   └── collection.py       # Collection model
-│   └── database/        # Database configuration and sessions
-├── alembic/             # Database migration scripts
-│   ├── versions/               # Migration versions
-│   └── env.py                  # Alembic environment config
-├── .env                 # Environment variables (not in git)
-├── .env.example         # Example environment configuration
+│   ├── search/                    # Advanced search features
+│   │   ├── hybrid_search.py       # Hybrid search implementation
+│   │   ├── query_expansion.py     # Query expansion logic
+│   │   ├── semantic_cache.py      # Semantic caching system
+│   │   └── reranker.py            # Document reranking
+│   ├── models/                    # SQLAlchemy ORM models
+│   │   ├── document.py            # Document model
+│   │   ├── chunk.py               # Chunk model
+│   │   ├── collection.py          # Collection model
+│   │   └── cache_entry.py         # Semantic cache model
+│   └── database/                  # Database configuration and sessions
+├── alembic/                       # Database migration scripts
+│   ├── versions/                  # Migration versions
+│   └── env.py                     # Alembic environment config
+├── .env                           # Environment variables (not in git)
+├── .env.example                   # Example environment configuration
 ├── .gitignore
 ├── Dockerfile
 ├── docker-compose.yml
-├── logger.py            # Logging configuration
-├── main.py              # Application entry point
-└── requirements.txt     # Python dependencies
+├── logger.py                      # Logging configuration
+├── main.py                        # Application entry point
+└── requirements.txt               # Python dependencies
 ```
 
 ## 🗃️ Database Architecture
 
 ### Overview
-
 MiniRAG uses a hybrid storage approach combining PostgreSQL and vector databases for optimal performance:
 
-- **PostgreSQL**: Stores original documents, text chunks, and metadata
+- **PostgreSQL**: Stores original documents, text chunks, metadata, and semantic cache
 - **Vector Database** (Qdrant/pgvector): Stores embeddings for semantic search
 - **SQLAlchemy**: Manages database schema and relationships
 - **Alembic**: Handles schema migrations
@@ -146,6 +162,7 @@ Stores text chunks extracted from documents:
 - Embedding ID (reference to vector database)
 - Token count
 - Chunk-specific metadata
+- BM25 scores (for keyword search)
 
 #### Collections Table
 Groups related documents together:
@@ -155,6 +172,17 @@ Groups related documents together:
 - Created timestamp
 - Associated documents
 
+#### Cache Entries Table
+Stores semantic cache for query optimization:
+- Cache ID (primary key)
+- Query text
+- Query embedding
+- Response content
+- Metadata (context, parameters)
+- Hit count
+- Last accessed timestamp
+- Created timestamp
+
 ### Data Flow
 
 1. **Document Upload**: Original document stored in PostgreSQL documents table
@@ -162,11 +190,13 @@ Groups related documents together:
 3. **Embedding Generation**: LLM provider generates vector embeddings for each chunk
 4. **Vector Storage**: Embeddings stored in vector database (Qdrant or pgvector)
 5. **Linking**: Chunk records updated with embedding IDs to maintain relationship
-6. **Query Processing**: 
-   - User query converted to embedding
-   - Vector database finds similar embeddings
-   - PostgreSQL retrieves corresponding chunk content and metadata
-   - LLM generates response using retrieved context
+6. **Query Processing**:
+   - Check semantic cache for similar queries
+   - Expand query if enabled (generate query variations)
+   - Perform hybrid search (combine semantic and keyword search)
+   - Rerank retrieved documents by relevance
+   - LLM generates response using top-ranked context
+   - Cache response for future similar queries
 
 ### Chunking Strategy
 
@@ -185,12 +215,161 @@ SQLAlchemy provides:
 - **Type Safety**: Python type hints for database fields
 - **JSON Field Support**: Native handling of metadata fields
 
+## 🚀 Advanced Features
+
+### 1. Hybrid Search
+
+Hybrid search combines semantic (vector-based) and keyword (BM25) search to leverage the strengths of both approaches:
+
+**How it works:**
+- **Semantic Search**: Finds documents with similar meanings using vector embeddings
+- **Keyword Search**: Finds documents with exact term matches using BM25 algorithm
+- **Score Fusion**: Combines scores using configurable alpha parameter (0.0 = pure semantic, 1.0 = pure keyword)
+
+**Benefits:**
+- Better recall for specific terminology and proper nouns
+- Improved semantic understanding for conceptual queries
+- Balanced results that capture both exact matches and related concepts
+
+**Configuration:**
+```env
+ENABLE_HYBRID_SEARCH=true
+HYBRID_SEARCH_ALPHA=0.5  # Adjust weight between semantic and keyword
+```
+
+**Usage:**
+```python
+# Automatic hybrid search when querying
+results = rag_system.query(
+    "What are transformer models?",
+    search_type="hybrid",
+    alpha=0.5
+)
+```
+
+### 2. Query Expansion
+
+Query expansion automatically generates variations of the user's query to improve retrieval coverage:
+
+**How it works:**
+- Takes original user query
+- Uses LLM to generate semantically similar query variations
+- Performs search with all query versions
+- Merges and deduplicates results
+
+**Benefits:**
+- Captures different phrasings of the same question
+- Improves recall for ambiguous queries
+- Handles terminology variations
+
+**Configuration:**
+```env
+ENABLE_QUERY_EXPANSION=true
+QUERY_EXPANSION_COUNT=3  # Number of variations to generate
+```
+
+**Example:**
+```
+Original query: "How to train neural networks?"
+
+Expanded queries:
+1. "What are the methods for training deep learning models?"
+2. "Neural network training techniques and best practices"
+3. "Step-by-step guide to training artificial neural networks"
+```
+
+### 3. Semantic Cache
+
+Semantic cache stores previous query results and returns cached responses for similar queries:
+
+**How it works:**
+- Query is converted to embedding
+- System checks cache for similar query embeddings
+- If similarity exceeds threshold, returns cached response
+- Otherwise, performs full retrieval and caches new result
+
+**Benefits:**
+- Reduces API calls to LLM providers (cost savings)
+- Faster response times for common queries
+- Improved system efficiency
+
+**Configuration:**
+```env
+ENABLE_SEMANTIC_CACHE=true
+CACHE_SIMILARITY_THRESHOLD=0.95  # Cosine similarity threshold
+```
+
+**Cache Management:**
+```python
+# Cache is automatically managed
+# View cache statistics
+cache_stats = rag_system.get_cache_statistics()
+
+# Clear cache if needed
+rag_system.clear_cache(older_than_days=7)
+```
+
+### 4. Document Reranking
+
+Reranking reorders retrieved documents using LLM-based relevance scoring:
+
+**How it works:**
+- Initial retrieval returns top N documents (e.g., top 20)
+- Reranker uses LLM to score each document's relevance to query
+- Documents reordered by relevance scores
+- Top K documents used for generation (e.g., top 5)
+
+**Benefits:**
+- Improves precision of retrieved context
+- Better handles complex queries requiring deep understanding
+- Reduces noise in context sent to generation LLM
+
+**Configuration:**
+```env
+ENABLE_RERANKING=true
+RERANK_TOP_K=10  # Number of documents to rerank
+```
+
+**Reranking Models:**
+- OpenAI: Uses GPT-based relevance scoring
+- Cohere: Uses dedicated Rerank API endpoint
+
+**Usage:**
+```python
+results = rag_system.query(
+    "Explain attention mechanisms",
+    retrieve_k=20,  # Retrieve 20 documents
+    rerank_top_k=5  # Rerank and use top 5
+)
+```
+
+### Complete Search Pipeline
+
+When all features are enabled, the search pipeline works as follows:
+
+```
+User Query
+    ↓
+1. Check Semantic Cache
+    ↓ (cache miss)
+2. Query Expansion (generate 3 variations)
+    ↓
+3. Hybrid Search (semantic + keyword, alpha=0.5)
+    ↓ (retrieve top 20 documents)
+4. Document Reranking (reorder by relevance)
+    ↓ (keep top 5 documents)
+5. LLM Generation (generate response with context)
+    ↓
+6. Cache Response (store for future queries)
+    ↓
+Final Response
+```
+
 ## 💻 Usage
 
 ### Running the Application
 
 #### Local Development
-
 ```bash
 # Activate virtual environment
 source venv/bin/activate
@@ -203,7 +382,6 @@ python main.py
 ```
 
 #### Using Docker
-
 ```bash
 # Build and start all services
 docker-compose up -d
@@ -218,14 +396,35 @@ docker-compose logs -f minirag-app
 docker-compose down
 ```
 
-### Workflow Overview
+### Query Examples
 
-1. **Initialize**: Application connects to PostgreSQL and vector database
-2. **Upload Documents**: Documents stored in PostgreSQL with metadata
-3. **Process**: Documents automatically chunked and embedded
-4. **Query**: User queries matched against vector embeddings
-5. **Retrieve**: Relevant chunks fetched from PostgreSQL
-6. **Generate**: LLM generates response using retrieved context
+#### Basic Query
+```python
+response = rag_system.query("What is machine learning?")
+```
+
+#### Query with Custom Parameters
+```python
+response = rag_system.query(
+    query="Explain neural networks",
+    search_type="hybrid",
+    alpha=0.6,
+    retrieve_k=20,
+    rerank_top_k=5,
+    expand_query=True,
+    use_cache=True
+)
+```
+
+#### Disable Specific Features
+```python
+response = rag_system.query(
+    query="What are transformers?",
+    expand_query=False,  # Disable query expansion
+    use_cache=False,     # Skip cache lookup
+    search_type="semantic"  # Use only semantic search
+)
+```
 
 ## 🗄️ Database Migrations
 
@@ -234,7 +433,6 @@ docker-compose down
 Alembic tracks and manages database schema changes over time.
 
 #### Initial Setup
-
 ```bash
 # Initialize Alembic (if not already done)
 alembic init alembic
@@ -243,17 +441,15 @@ alembic init alembic
 ```
 
 #### Creating Migrations
-
 ```bash
 # Auto-generate migration from model changes
-alembic revision --autogenerate -m "Add user preferences table"
+alembic revision --autogenerate -m "Add semantic cache table"
 
 # Create empty migration for manual changes
-alembic revision -m "Add custom indexes"
+alembic revision -m "Add custom indexes for hybrid search"
 ```
 
 #### Applying Migrations
-
 ```bash
 # Upgrade to latest version
 alembic upgrade head
@@ -269,7 +465,6 @@ alembic downgrade <revision_id>
 ```
 
 #### Migration History
-
 ```bash
 # View current database version
 alembic current
@@ -282,7 +477,6 @@ alembic history --verbose
 ```
 
 #### Best Practices
-
 - Always review auto-generated migrations before applying
 - Test migrations on development database first
 - Create database backups before production migrations
@@ -297,7 +491,7 @@ The application includes three main services:
 
 #### PostgreSQL Service
 - **Image**: PostgreSQL 15 Alpine
-- **Purpose**: Stores documents, chunks, and metadata
+- **Purpose**: Stores documents, chunks, metadata, and cache
 - **Port**: 5432
 - **Volume**: Persistent storage for database files
 - **Health Check**: Ensures database is ready before app starts
@@ -379,23 +573,26 @@ docker-compose -f docker-compose.yml -f docker-compose.test.yml up
 - **Capabilities**: Text generation, embeddings, chat completions
 - **Configuration**: Requires OPENAI_API_KEY
 - **Use Cases**: General-purpose text generation, high-quality embeddings
+- **Reranking**: Uses GPT-based relevance scoring
 
 #### Cohere
 - **Models**: Command, Command-light, Embed
-- **Capabilities**: Text generation, embeddings, reranking
+- **Capabilities**: Text generation, embeddings, dedicated reranking
 - **Configuration**: Requires COHERE_API_KEY
-- **Use Cases**: Multilingual support, semantic reranking
+- **Use Cases**: Multilingual support, optimized reranking
+- **Reranking**: Uses dedicated Rerank API (optimal performance)
 
 ### Vector Databases
 
 #### Qdrant
 - **Type**: Dedicated vector search engine
 - **Deployment**: Cloud-hosted or self-hosted
-- **Features**: 
+- **Features**:
   - High-performance similarity search
   - Payload filtering
   - Real-time indexing
   - Horizontal scaling
+  - Hybrid search support
 - **Configuration**: Requires QDRANT_URL
 - **Best For**: Large-scale deployments, high-throughput applications
 
@@ -407,8 +604,9 @@ docker-compose -f docker-compose.yml -f docker-compose.test.yml up
   - ACID compliance
   - Familiar SQL interface
   - Simpler infrastructure
+  - Hybrid search with full-text search
 - **Configuration**: Automatic with DATABASE_URL
-- **Best For**: Smaller deployments, simplified architecture
+- **Best For**: Smaller deployments, unified database architecture
 
 ## 🛠️ Configuration
 
@@ -421,19 +619,39 @@ All configuration is managed through environment variables in the `.env` file:
 - **VECTOR_DB**: Choice of vector database (qdrant, pgvector)
 - **API Keys**: Provider-specific authentication
 - **LOG_LEVEL**: Application logging verbosity
+- **Search Features**: Enable/disable hybrid search, query expansion, cache, reranking
+- **Search Parameters**: Alpha, expansion count, cache threshold, rerank top-k
 
 ### Provider Selection
 
 Switch between providers by changing environment variables - no code changes required:
 
 ```bash
-# Use OpenAI with Qdrant
+# Use OpenAI with Qdrant and all advanced features
 LLM_PROVIDER=openai
 VECTOR_DB=qdrant
+ENABLE_HYBRID_SEARCH=true
+ENABLE_QUERY_EXPANSION=true
+ENABLE_SEMANTIC_CACHE=true
+ENABLE_RERANKING=true
 
 # Use Cohere with pgvector
 LLM_PROVIDER=cohere
 VECTOR_DB=pgvector
+```
+
+### Performance Tuning
+
+```env
+# Optimize for speed (lower quality)
+HYBRID_SEARCH_ALPHA=0.8  # More keyword-based
+QUERY_EXPANSION_COUNT=2  # Fewer variations
+RERANK_TOP_K=5          # Rerank fewer documents
+
+# Optimize for quality (slower)
+HYBRID_SEARCH_ALPHA=0.3  # More semantic
+QUERY_EXPANSION_COUNT=5  # More variations
+RERANK_TOP_K=15         # Rerank more documents
 ```
 
 ## 📊 Logging
@@ -444,6 +662,7 @@ The application includes comprehensive logging:
 - **Console**: Colored console output for development
 - **Levels**: DEBUG, INFO, WARNING, ERROR, CRITICAL
 - **Configuration**: Managed through `logger.py`
+- **Search Metrics**: Logs cache hits, search times, reranking scores
 
 ## 🧪 Testing
 
@@ -455,24 +674,30 @@ pytest
 pytest --cov=src tests/
 
 # Run specific test file
-pytest tests/test_llm_providers.py
+pytest tests/test_hybrid_search.py
 
 # Run tests with verbose output
 pytest -v
+
+# Test specific features
+pytest tests/test_query_expansion.py
+pytest tests/test_semantic_cache.py
+pytest tests/test_reranker.py
 ```
+
 ## 🙏 Acknowledgments
 
 - **OpenAI**: GPT models and embeddings API
-- **Cohere**: Language models and embedding services
+- **Cohere**: Language models, embedding services, and Rerank API
 - **Qdrant**: High-performance vector search engine
 - **PostgreSQL**: Robust relational database
 - **SQLAlchemy**: Python SQL toolkit and ORM
 - **Alembic**: Database migration tool
+- **Rank-BM25**: Efficient BM25 implementation for keyword search
 
 ## 📧 Support
 
 For questions, issues, or feature requests:
-
 - Open an issue on GitHub
 - Check existing documentation
 - Review closed issues for solutions
@@ -484,7 +709,9 @@ For questions, issues, or feature requests:
 - Rotate API keys regularly
 - Keep dependencies updated
 - Review security advisories
+- Implement rate limiting for production deployments
+- Monitor cache for sensitive information
 
 ---
 
-**MiniRAG** - Flexible RAG system with multi-provider support
+**MiniRAG** - Advanced RAG system with hybrid search, query expansion, semantic caching, and document reranking
