@@ -1,4 +1,4 @@
-# MiniRAG
+# AdvancedRAG
 A flexible and scalable Retrieval-Augmented Generation (RAG) system supporting multiple LLM providers, vector databases, and advanced search capabilities.
 
 ## 🌟 Features
