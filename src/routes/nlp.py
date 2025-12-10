@@ -52,7 +52,6 @@ async def index_project(request: Request, project_id: int, push_request: PushReq
         project_id=project.project_id
     )
 
-
     _ = await request.app.vectordb_client.create_collection(
         collection_name=collection_name,
         embedding_size=request.app.embedding_client.embedding_size,
@@ -152,14 +151,9 @@ async def search_index(request: Request, project_id: int, search_request: Search
         template_parser=request.app.template_parser
     )
 
-    _ , expanded_query_vector, expanded_query = await nlp_controller.calculate_embeddings(
-        text=search_request.text
-    )
-
     results = await nlp_controller.search_vector_db_collection(
         project=project,
-        query_vector=expanded_query_vector,
-        expanded_query=expanded_query,
+        query=search_request.text,
         limit=search_request.limit
     )
 
@@ -196,11 +190,11 @@ async def answer_rag(request: Request, project_id: int, search_request: SearchRe
         template_parser=request.app.template_parser
     )
 
-    query_vector, expanded_query_vector, expanded_query = await nlp_controller.calculate_embeddings(
+    query_vector = await nlp_controller.query_embeddings(
         text=search_request.text
     )
 
-    # Retrieve answer from cashe if exists
+    # Retrieve answer from cache if exists
     cache_answer = await nlp_controller.retrieve_answer_from_cache(
         project=project,
         query_vector=query_vector
@@ -218,8 +212,6 @@ async def answer_rag(request: Request, project_id: int, search_request: SearchRe
     answer, full_prompt, chat_history = await nlp_controller.rag_answer_question(
         project=project,
         query=search_request.text,
-        query_vector=expanded_query_vector,
-        expanded_query=expanded_query,
         limit=search_request.limit
     )
 
