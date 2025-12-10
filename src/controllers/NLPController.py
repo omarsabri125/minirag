@@ -7,9 +7,10 @@ import json
 
 class NLPController(BaseController):
 
-    def __init__(self, vector_db_client, embedding_client, generation_client, template_parser):
+    def __init__(self, vector_db_client, cross_encoder, embedding_client, generation_client, template_parser):
         super().__init__()
         self.vector_db_client = vector_db_client
+        self.cross_encoder = cross_encoder
         self.embedding_client = embedding_client
         self.generation_client = generation_client
         self.template_parser = template_parser
@@ -141,6 +142,23 @@ class NLPController(BaseController):
             response_text=answer
         )
         return True
+    
+    async def rerank_documents(self, expanded_query: str, documents: list):
+
+        rankings = self.cross_encoder.rank(
+            expanded_query,
+            documents,
+            return_documents=True,
+            convert_to_tensor=True
+        )
+        result = [
+            {
+                "text": ranking['text'],
+                "score": f"{ranking['score']:.4f}"
+            }
+            for ranking in rankings[:3]
+        ]
+        return result
 
     async def search_vector_db_collection(self, project: Project, query_vector: list, expanded_query: str, limit: int = 5):
 
@@ -156,8 +174,15 @@ class NLPController(BaseController):
 
         if not result:
             return False
+        
+        documents = [res.text for res in result]
 
-        return result
+        result_rerank = await self.rerank_documents(
+        expanded_query=expanded_query,
+        documents=documents
+        )
+
+        return result_rerank
     
     async def rag_answer_question(self, project: Project, query:str, query_vector: list, expanded_query: str, limit: int = 5):
 
@@ -178,7 +203,7 @@ class NLPController(BaseController):
         documents_prompt = "\n".join([
             self.template_parser.get("rag", "document_prompt", {
                 "doc_num": idx+1,
-                "chunk_text": doc.text
+                "chunk_text": doc['text']
             })
             for idx, doc in enumerate(retrieved_documents)
         ])
