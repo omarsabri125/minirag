@@ -34,6 +34,7 @@ async def index_project(request: Request, project_id: int, push_request: PushReq
 
     nlp_controller = NLPController(
         vector_db_client=request.app.vectordb_client,
+        cross_encoder=request.app.cross_encoder,
         embedding_client=request.app.embedding_client,
         generation_client=request.app.generation_client,
         template_parser=request.app.template_parser
@@ -116,6 +117,7 @@ async def get_project_index_info(request: Request, project_id: int):
 
     nlp_controller = NLPController(
         vector_db_client=request.app.vectordb_client,
+        cross_encoder=request.app.cross_encoder,
         embedding_client=request.app.embedding_client,
         generation_client=request.app.generation_client,
         template_parser=request.app.template_parser
@@ -144,6 +146,7 @@ async def search_index(request: Request, project_id: int, search_request: Search
 
     nlp_controller = NLPController(
         vector_db_client=request.app.vectordb_client,
+        cross_encoder=request.app.cross_encoder,
         embedding_client=request.app.embedding_client,
         generation_client=request.app.generation_client,
         template_parser=request.app.template_parser
@@ -172,7 +175,7 @@ async def search_index(request: Request, project_id: int, search_request: Search
         status_code=200,
         content={
             "signal": ResponseEnumeration.VECTORDB_SEARCH_SUCCESS.value,
-            "results": [result.dict() for result in results]
+            "results": results
         }
     )
 
@@ -187,6 +190,7 @@ async def answer_rag(request: Request, project_id: int, search_request: SearchRe
 
     nlp_controller = NLPController(
         vector_db_client=request.app.vectordb_client,
+        cross_encoder=request.app.cross_encoder,
         embedding_client=request.app.embedding_client,
         generation_client=request.app.generation_client,
         template_parser=request.app.template_parser
